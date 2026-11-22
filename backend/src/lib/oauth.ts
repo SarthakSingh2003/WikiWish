@@ -72,41 +72,51 @@ export async function initiateOAuth(): Promise<{
     throw new Error('OAuth consumer key or secret is missing from environment variables');
   }
 
-  const initiateUrl = `${MEDIAWIKI_OAUTH_URL}?title=Special:OAuth/initiate`;
-  const nonce = crypto.randomBytes(16).toString('hex');
-  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const sendInitiateRequest = async (cb: string) => {
+    const initiateUrl = `${MEDIAWIKI_OAUTH_URL}?title=Special:OAuth/initiate`;
+    const nonce = crypto.randomBytes(16).toString('hex');
+    const timestamp = Math.floor(Date.now() / 1000).toString();
 
-  const oauthParams = {
-    oauth_callback: callbackUrl,
-    oauth_consumer_key: consumerKey,
-    oauth_nonce: nonce,
-    oauth_signature_method: 'HMAC-SHA1',
-    oauth_timestamp: timestamp,
-    oauth_version: '1.0',
+    const oauthParams = {
+      oauth_callback: cb,
+      oauth_consumer_key: consumerKey,
+      oauth_nonce: nonce,
+      oauth_signature_method: 'HMAC-SHA1',
+      oauth_timestamp: timestamp,
+      oauth_version: '1.0',
+    };
+
+    const authHeader = buildOAuthHeader('POST', initiateUrl, oauthParams, consumerSecret, '');
+
+    const response = await fetch(initiateUrl, {
+      method: 'POST',
+      headers: {
+        'User-Agent': USER_AGENT,
+        'Authorization': authHeader,
+      },
+    });
+
+    const bodyText = await response.text();
+    return { ok: response.ok, bodyText };
   };
 
-  const authHeader = buildOAuthHeader('POST', initiateUrl, oauthParams, consumerSecret, '');
+  let result = await sendInitiateRequest(callbackUrl);
 
-  const response = await fetch(initiateUrl, {
-    method: 'POST',
-    headers: {
-      'User-Agent': USER_AGENT,
-      'Authorization': authHeader,
-    },
-  });
-
-  const bodyText = await response.text();
-
-  if (!response.ok || bodyText.startsWith('Error:')) {
-    throw new Error(`Wikimedia OAuth initiate failed: ${bodyText}`);
+  // If MediaWiki requires "oob" because the callback URL was registered statically in the consumer
+  if (!result.ok && result.bodyText.includes('oauth_callback must be set, and must be set to') && callbackUrl !== 'oob') {
+    result = await sendInitiateRequest('oob');
   }
 
-  const params = new URLSearchParams(bodyText);
+  if (!result.ok || result.bodyText.startsWith('Error:')) {
+    throw new Error(`Wikimedia OAuth initiate failed: ${result.bodyText}`);
+  }
+
+  const params = new URLSearchParams(result.bodyText);
   const oauthToken = params.get('oauth_token');
   const oauthTokenSecret = params.get('oauth_token_secret');
 
   if (!oauthToken || !oauthTokenSecret) {
-    throw new Error(`Failed to parse OAuth initiate response: ${bodyText}`);
+    throw new Error(`Failed to parse OAuth initiate response: ${result.bodyText}`);
   }
 
   const authorizeUrl = `https://meta.wikimedia.org/wiki/Special:OAuth/authorize?oauth_token=${encodeURIComponent(
