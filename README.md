@@ -1,203 +1,55 @@
-# WikiWish
+# 🌟 WikiWish
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)](https://www.typescriptlang.org/)
+<p align="center">
+  <img src="frontend/public/wikiwish.png" alt="WikiWish Logo" width="120" />
+</p>
 
-**WikiWish: Your wishes, all in one place.**
+<p align="center">
+  <strong>Your Wishes, All in One Place.</strong><br />
+  A modern, community-driven platform to discover, track, and support proposals from the Wikimedia Community Wishlist.
+</p>
 
-Explore, track and discover Community Wishlist contributions.
+<p align="center">
+  <a href="https://wikiwish.toolforge.org"><strong>🌐 Visit WikiWish Live on Toolforge</strong></a>
+</p>
 
-## Overview
+---
 
-WikiWish is an independent, community-built web application that helps Wikimedia contributors keep track of their Community Wishlist activity.
+## 📖 About WikiWish
 
-### Features
+The **Wikimedia Community Wishlist** receives hundreds of proposals annually across diverse Wikimedia projects, language communities, and technical areas. Following discussions, monitoring proposal progress, and seeing personal contribution history across scattered wiki pages can be challenging for editors and developers.
 
-- **Created by me**: See all wishes you've submitted to the Community Wishlist
-- **Supported by me**: Discover wishes you've voted for or supported
-- **User Explorer**: Browse other Wikimedia contributors' wishlist activity
-- **Modern UI**: Clean, responsive design with light and dark themes
+**WikiWish** provides an intuitive, real-time dashboard and curation interface directly synchronized with **Wikimedia Meta-Wiki**. It allows contributors to track their submissions, explore what other community members are proposing, and participate in wishlist voting through an interface designed for speed and accessibility.
 
-### Screenshots
+---
 
-![Home page showing navigation and features](https://raw.githubusercontent.com/wikiwish/wikiwish/main/docs/screenshots/home.png)
-![Dashboard with created/supported tabs](https://raw.githubusercontent.com/wikiwish/wikiwish/main/docs/screenshots/dashboard.png)
+## ✨ Key Features
 
-## Technology Stack
+- **⚡ Real-Time Meta-Wiki Synchronization**: Live integration with the MediaWiki Action API (`communityrequests-wishes`). Vote counts, proposal descriptions, tags, and discussions stay in sync with Meta-Wiki in real time.
+- **🔒 Genuine Wikimedia OAuth 1.0a**: Authenticate securely using your official Wikimedia account. Zero mock accounts, zero password storage, ensuring verified contributor attribution for all votes.
+- **🗳️ Direct In-App Voting & Support**: Support proposals, submit rationale comments, or update your existing votes directly from WikiWish—instantly recorded on Meta-Wiki.
+- **👥 Contributor Explorer**: Search any Wikimedia contributor to inspect their submitted proposals, supported wishlist items, and overall community activity.
+- **🏷️ Smart Filtering & Tags**: Effortlessly filter proposals by status (*Under Review*, *Draft*, *Completed*, etc.), category, or technical area (e.g., *editing*, *multimedia*, *patrolling*, *mobile*).
+- **📱 Fully Responsive Design**: Seamless experience across smartphones, tablets, and ultra-wide desktop screens with native-like mobile navigation.
+- **🌓 Dark & Light Modes**: Beautiful themes engineered to match modern web standards and high-contrast accessibility.
+
+---
+
+## 🛠️ Technology Stack
 
 | Layer | Technology |
-|-------|------------|
-| Frontend | React 18, TypeScript, Vite, Tailwind CSS |
-| Backend | Node.js, Express, TypeScript |
-| State Management | TanStack Query (React Query) |
-| Routing | React Router DOM |
-| UI Components | Custom components with Lucide icons |
-| Authentication | Wikimedia OAuth 1.0a |
-| API | MediaWiki Action API (Meta-Wiki) |
+|---|---|
+| **Frontend** | React 18, TypeScript, Vite, Tailwind CSS |
+| **Backend** | Node.js, Express, TypeScript |
+| **State Management** | TanStack Query (React Query) |
+| **Authentication** | Wikimedia OAuth 1.0a (RFC 5849 HMAC-SHA1) |
+| **Data Engine** | MediaWiki Action API (`meta.wikimedia.org`) |
+| **Icons & Design** | Lucide React |
 
-## Architecture
+---
 
-```mermaid
-graph TD
-    User[User Browser] --> FE[Frontend: React/Vite]
-    FE --> API[Backend: Express]
-    API --> MW[MediaWiki API]
-    API --> OAuth[Wikimedia OAuth 1.0a]
-```
+## 📄 License & Attribution
 
-See [Architecture Documentation](docs/ARCHITECTURE.md) for detailed system design.
+This project is licensed under the **[MIT License](LICENSE)**.
 
-## Quick Start
-
-### Prerequisites
-
-- Node.js 18+ or later
-- npm or yarn
-- Git
-
-### Setup
-
-```bash
-git clone https://github.com/wikiwish/wikiwish.git
-cd wikiwish
-
-# Create environment files
-cp frontend/.env.example frontend/.env
-cp backend/.env.example backend/.env
-```
-
-### Development
-
-```bash
-# Terminal 1: Backend
-npm run dev --prefix backend
-
-# Terminal 2: Frontend
-npm run dev --prefix frontend
-```
-
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-### OAuth for Testing
-
-To test the full OAuth flow, you need OAuth credentials from Wikimedia:
-
-1. Go to https://meta.wikimedia.org/wiki/Special:OAuthConsumerRegistration/propose
-2. Propose a consumer with callback: `http://localhost:8080/api/auth/callback`
-3. Copy the key and secret to `backend/.env`
-
-## API Endpoints
-
-| Route | Description |
-|-------|-------------|
-| `GET /` | Home page |
-| `GET /dashboard` | Personal dashboard |
-| `GET /dashboard/created` | Wishes created by you |
-| `GET /dashboard/supported` | Wishes supported by you |
-| `GET /explore` | Browse wishes |
-| `GET /user/:username` | Contributor profile |
-| `GET /wish/:id` | Wish details |
-| `GET /about` | About page |
-
-See [API Documentation](docs/API.md) for complete API reference.
-
-## Deployment
-
-WikiWish can be deployed to:
-
-1. **Wikimedia Toolforge** (Recommended)
-2. **Any Node.js compatible host**
-
-See [Deployment Guide](docs/DEPLOYMENT.md) for detailed instructions.
-
-### Toolforge Deployment
-
-```bash
-# SSH into Toolforge
-ssh username@tools.toolforge.org
-
-# Deploy your tool
-# Set environment variables and start service
-webservice --site=meta-wiki start
-```
-
-## Development
-
-### Project Structure
-
-```
-wikiwish/
-├── frontend/              # React frontend
-├── backend/               # Node.js backend
-├── docs/                  # Documentation
-└── package.json
-```
-
-### Available Scripts
-
-```bash
-npm run dev --prefix backend    # Start backend dev server
-npm run build --prefix backend  # Build backend for production
-npm run dev --prefix frontend   # Start frontend dev server
-npm run build --prefix frontend # Build frontend for production
-```
-
-## OAuth Configuration
-
-WikiWish uses Wikimedia OAuth 1.0a for authentication.
-
-### Required Environment Variables
-
-| Variable | Description |
-|----------|-------------|
-| `OAUTH_CONSUMER_KEY` | OAuth consumer key |
-| `OAUTH_CONSUMER_SECRET` | OAuth consumer secret |
-| `OAUTH_CALLBACK_URL` | OAuth callback URL |
-| `SESSION_SECRET` | Random session secret |
-| `CORS_ORIGINS` | Allowed origins (comma-separated) |
-
-See [Authentication Guide](docs/AUTHENTICATION.md) for OAuth setup.
-
-## Data Sources
-
-WikiWish uses public data from Meta-Wiki:
-
-- **Community Wishlist**: https://meta.wikimedia.org/wiki/Community_Wishlist
-- **MediaWiki Action API**: https://meta.wikimedia.org/w/api.php
-- **CommunityRequests Extension**: Handles wishlist storage
-
-## Privacy
-
-WikiWish is privacy-conscious:
-
-- Only uses public Meta-Wiki data
-- OAuth tokens stored in session, not persisted
-- No collection of personal information beyond username
-- No tracking or analytics
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/my-feature`
-3. Make your changes
-4. Run tests and linting
-5. Submit a pull request
-
-Please read [Contributing Guidelines](CONTRIBUTING.md) before submitting.
-
-## Issues
-
-Report bugs and request features at:
-https://github.com/wikiwish/wikiwish/issues
-
-## License
-
-MIT License - see [LICENSE](LICENSE) for details.
-
-WikiWish is an independent, community-built tool and is not affiliated with or endorsed by the Wikimedia Foundation.
-
-## Support
-
-- GitHub Issues: https://github.com/wikiwish/wikiwish/issues
-- Wikimedia Cloud Services: https://wikitech.wikimedia.org/wiki/Portal:Toolforge
-- Chat: Join #wikimedia-cloud on IRC or Telegram
+WikiWish is an independent community tool built to empower contributors across the Wikimedia movement. It connects directly to public Wikimedia APIs and is hosted on [Wikimedia Toolforge](https://wikitech.wikimedia.org/wiki/Portal:Toolforge).
