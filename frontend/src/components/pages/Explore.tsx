@@ -27,7 +27,7 @@ export function Explore() {
   const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ['explore-wishes'],
     queryFn: async () => {
-      const response = await fetch('/api/wishes?limit=100');
+      const response = await fetch('/api/wishes?limit=1000');
       if (!response.ok) throw new Error('Failed to load wishes from Wikimedia API');
       return response.json();
     },

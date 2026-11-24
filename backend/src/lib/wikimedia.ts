@@ -122,13 +122,16 @@ class WikimediaClient {
 
     let response: any;
     try {
-      response = await fetch(url.toString(), {
+      const fetchFn = typeof globalThis.fetch === 'function' ? globalThis.fetch : fetch;
+      response = await fetchFn(url.toString(), {
         headers: {
           'User-Agent': USER_AGENT,
+          'Accept-Encoding': 'identity',
           ...headers,
         },
-        timeout: 10000,
-      });
+        compress: false,
+        timeout: 15000,
+      } as any);
     } catch (error) {
       this.releaseConcurrency();
       throw error;
@@ -149,51 +152,78 @@ class WikimediaClient {
     return data;
   }
 
-  async getAllWishes(limit: number = 100, continueToken?: string): Promise<{ wishes: WikiWish[]; continue?: string }> {
-    const params = new URLSearchParams({
-      action: 'query',
-      list: 'communityrequests-wishes',
-      crwlimit: Math.min(limit, 500).toString(),
-      crwprop: 'tags|status|type|title|votecount|created|updated|description|proposer|focusarea',
-    });
+  private allWishesCache: WikiWish[] | null = null;
+  private allWishesCacheTime = 0;
+  private readonly ALL_WISHES_TTL = 3 * 60 * 1000; // 3 minutes
 
-    if (continueToken) {
-      params.set('crwcontinue', continueToken);
+  async fetchAllWishesFromMeta(): Promise<WikiWish[]> {
+    const now = Date.now();
+    if (this.allWishesCache && (now - this.allWishesCacheTime) < this.ALL_WISHES_TTL) {
+      return this.allWishesCache;
     }
 
-    const data = await this.request(params);
-    const rawWishes = data.query?.['communityrequests-wishes'] || data.query?.communityrequests_wishes || [];
-    const newContinue = data.continue?.crwcontinue as string | undefined;
+    const allWishes: WikiWish[] = [];
+    let continueToken: string | undefined = undefined;
 
-    const wishes: WikiWish[] = rawWishes.map((w: any) => {
-      const normalizedStatus = w.status === 'done' ? 'completed' : (w.status || 'under-review');
-      return {
-        id: w.id,
-        status: normalizedStatus,
-        type: w.type || 'feature',
-        title: w.title || w.crwtitle || 'Untitled Wish',
-        tags: Array.isArray(w.tags) ? w.tags : [],
-        votecount: typeof w.votecount === 'number' ? w.votecount : 0,
-        created: w.created || new Date().toISOString(),
-        updated: w.updated || w.created || new Date().toISOString(),
-        crwns: w.crwns || 0,
-        crwtitle: w.crwtitle || `Community Wishlist/W${w.id}`,
-        description: w.description || '',
-        author: w.proposer || w.author,
-        focusArea: w.focusarea || w.focusArea,
-        supporters: w.supporters || [],
-      };
-    });
+    // Fetch in batches of 500 (MediaWiki maximum) to cover all Community Wishlist wishes
+    for (let batch = 0; batch < 4; batch++) {
+      const params = new URLSearchParams({
+        action: 'query',
+        list: 'communityrequests-wishes',
+        crwlimit: '500',
+        crwprop: 'tags|status|type|title|votecount|created|updated|description|focusarea',
+      });
+      if (continueToken) {
+        params.set('crwcontinue', continueToken);
+      }
 
+      const data = await this.request(params);
+      const rawWishes = data.query?.['communityrequests-wishes'] || data.query?.communityrequests_wishes || [];
+
+      for (const w of rawWishes) {
+        const normalizedStatus = w.status === 'done' ? 'completed' : (w.status || 'under-review');
+        allWishes.push({
+          id: w.id,
+          status: normalizedStatus,
+          type: w.type || 'feature',
+          title: w.title || w.crwtitle || 'Untitled Wish',
+          tags: Array.isArray(w.tags) ? w.tags : [],
+          votecount: typeof w.votecount === 'number' ? w.votecount : 0,
+          created: w.created || new Date().toISOString(),
+          updated: w.updated || w.created || new Date().toISOString(),
+          crwns: w.crwns || 0,
+          crwtitle: w.crwtitle || `Community Wishlist/W${w.id}`,
+          description: w.description || '',
+          author: w.proposer || w.author,
+          focusArea: w.focusarea || w.focusArea,
+          supporters: w.supporters || [],
+        });
+      }
+
+      continueToken = data.continue?.crwcontinue as string | undefined;
+      if (!continueToken || rawWishes.length === 0) {
+        break;
+      }
+    }
+
+    this.allWishesCache = allWishes;
+    this.allWishesCacheTime = now;
+    return allWishes;
+  }
+
+  async getAllWishes(limit: number = 1000, continueToken?: string): Promise<{ wishes: WikiWish[]; continue?: string }> {
+    const allWishes = await this.fetchAllWishesFromMeta();
     return {
-      wishes,
-      ...(newContinue && { continue: newContinue }),
+      wishes: allWishes.slice(0, limit),
+      ...(allWishes.length > limit ? { continue: 'more' } : {}),
     };
   }
 
   async getWishById(wishId: number): Promise<WikiWish | null> {
-    const { wishes } = await this.getAllWishes(100);
-    const wish = wishes.find(w => w.id === wishId);
+    const allWishes = await this.fetchAllWishesFromMeta();
+    const wish = allWishes.find(
+      w => w.id === wishId || w.crwtitle.toLowerCase() === `community wishlist/w${wishId}`
+    );
     if (!wish) {
       return null;
     }
@@ -419,12 +449,81 @@ class WikimediaClient {
     }
   }
 
-  async searchWishes(query: string, limit: number = 20): Promise<WikiWish[]> {
-    const { wishes } = await this.getAllWishes(100);
-    const q = query.toLowerCase().trim();
-    if (!q) return wishes.slice(0, limit);
+  private userActivityCache = new Map<string, { createdTitles: Set<string>; supportedTitles: Set<string>; timestamp: number }>();
+  private readonly USER_ACTIVITY_TTL = 60 * 1000; // 60 seconds
 
-    return wishes.filter(w =>
+  private async fetchUserWishActivity(username: string): Promise<{ createdTitles: Set<string>; supportedTitles: Set<string> }> {
+    const normUser = username.trim().toLowerCase();
+    const now = Date.now();
+    const cached = this.userActivityCache.get(normUser);
+    if (cached && (now - cached.timestamp) < this.USER_ACTIVITY_TTL) {
+      return { createdTitles: cached.createdTitles, supportedTitles: cached.supportedTitles };
+    }
+
+    const createdTitles = new Set<string>();
+    const supportedTitles = new Set<string>();
+    let ucContinue: string | undefined = undefined;
+
+    // Scan user contributions in namespace 0 (Main/Wishlist) up to 4 batches (2000 edits max)
+    for (let page = 0; page < 4; page++) {
+      const params = new URLSearchParams({
+        action: 'query',
+        list: 'usercontribs',
+        ucuser: username,
+        ucnamespace: '0',
+        uclimit: '500',
+        ucprop: 'title|timestamp|comment|flags|ids',
+      });
+      if (ucContinue) {
+        params.set('uccontinue', ucContinue);
+      }
+
+      const data = await this.request(params);
+      const contribs = data.query?.usercontribs || [];
+
+      for (const c of contribs) {
+        const title = c.title || '';
+        if (!title.startsWith('Community Wishlist/')) continue;
+
+        // Support vote subpage: Community Wishlist/W<id>/Votes
+        const voteMatch = title.match(/^Community Wishlist\/(W\d+)\/Votes$/i);
+        if (voteMatch) {
+          supportedTitles.add(`Community Wishlist/${voteMatch[1].toUpperCase()}`);
+          continue;
+        }
+
+        // Wish page creation: Community Wishlist/W<id>
+        const wishMatch = title.match(/^Community Wishlist\/(W\d+)$/i);
+        if (wishMatch) {
+          const comment = (c.comment || '').toLowerCase();
+          const isCreation = c.parentid === 0 ||
+            c.new !== undefined ||
+            comment.includes('publish') ||
+            comment.includes('created page');
+
+          if (isCreation) {
+            createdTitles.add(`Community Wishlist/${wishMatch[1].toUpperCase()}`);
+          }
+        }
+      }
+
+      ucContinue = data.continue?.uccontinue as string | undefined;
+      if (!ucContinue || contribs.length === 0) {
+        break;
+      }
+    }
+
+    const result = { createdTitles, supportedTitles, timestamp: now };
+    this.userActivityCache.set(normUser, result);
+    return { createdTitles, supportedTitles };
+  }
+
+  async searchWishes(query: string, limit: number = 50): Promise<WikiWish[]> {
+    const allWishes = await this.fetchAllWishesFromMeta();
+    const q = query.toLowerCase().trim();
+    if (!q) return allWishes.slice(0, limit);
+
+    return allWishes.filter(w =>
       (w.title && w.title.toLowerCase().includes(q)) ||
       (w.description && w.description.toLowerCase().includes(q)) ||
       (w.tags && w.tags.some(t => t.toLowerCase().includes(q))) ||
@@ -433,67 +532,51 @@ class WikimediaClient {
     ).slice(0, limit);
   }
 
-  async getWishesCreatedBy(username: string, limit: number = 50): Promise<WikiWish[]> {
-    const { wishes } = await this.getAllWishes(100);
+  async getWishesCreatedBy(username: string, limit: number = 100): Promise<WikiWish[]> {
+    const allWishes = await this.fetchAllWishesFromMeta();
+    const normUser = username.trim().toLowerCase();
+
     try {
-      const params = new URLSearchParams({
-        action: 'query',
-        list: 'usercontribs',
-        ucuser: username,
-        ucnamespace: '0',
-        uclimit: '100',
-      });
-      const data = await this.request(params);
-      const contribs = data.query?.usercontribs || [];
-      const createdTitles = new Set<string>();
+      const { createdTitles } = await this.fetchUserWishActivity(username);
 
-      for (const c of contribs) {
-        const wishMatch = c.title.match(/^Community Wishlist\/(W\d+)$/i);
-        if (wishMatch && (c.new !== undefined || (c.comment && c.comment.toLowerCase().includes('publishing')))) {
-          createdTitles.add(c.title);
+      const userWishes = allWishes.filter(w => {
+        const crwUpper = (w.crwtitle || '').toUpperCase();
+        const isCreated = createdTitles.has(crwUpper);
+        const isAuthor = w.author && w.author.toLowerCase() === normUser;
+        return isCreated || isAuthor;
+      }).map(w => {
+        if (!w.author) {
+          return { ...w, author: username };
         }
-      }
+        return w;
+      });
 
-      const userWishes = wishes.filter(w =>
-        createdTitles.has(w.crwtitle) || (w.author && w.author.toLowerCase() === username.toLowerCase())
-      );
       return userWishes.slice(0, limit);
     } catch (e) {
-      console.warn('Error fetching user contribs for created wishes:', e);
-      return wishes.filter(w => w.author?.toLowerCase() === username.toLowerCase()).slice(0, limit);
+      console.warn('Error fetching user activity for created wishes:', e);
+      return allWishes.filter(w => w.author?.toLowerCase() === normUser).slice(0, limit);
     }
   }
 
-  async getWishesSupportedBy(username: string, limit: number = 50): Promise<WikiWish[]> {
-    const { wishes } = await this.getAllWishes(100);
+  async getWishesSupportedBy(username: string, limit: number = 100): Promise<WikiWish[]> {
+    const allWishes = await this.fetchAllWishesFromMeta();
+    const normUser = username.trim().toLowerCase();
+
     try {
-      const params = new URLSearchParams({
-        action: 'query',
-        list: 'usercontribs',
-        ucuser: username,
-        ucnamespace: '0',
-        uclimit: '100',
+      const { supportedTitles } = await this.fetchUserWishActivity(username);
+
+      const userSupported = allWishes.filter(w => {
+        const crwUpper = (w.crwtitle || '').toUpperCase();
+        const isVoted = supportedTitles.has(crwUpper);
+        const isSupporter = w.supporters?.some(s => s.username?.toLowerCase() === normUser);
+        return isVoted || isSupporter;
       });
-      const data = await this.request(params);
-      const contribs = data.query?.usercontribs || [];
-      const supportedWishTitles = new Set<string>();
 
-      for (const c of contribs) {
-        const voteMatch = c.title.match(/^Community Wishlist\/(W\d+)\/Votes$/i);
-        if (voteMatch) {
-          supportedWishTitles.add(`Community Wishlist/${voteMatch[1]}`);
-        }
-      }
-
-      const userSupported = wishes.filter(w =>
-        supportedWishTitles.has(w.crwtitle) ||
-        w.supporters?.some(s => s.username.toLowerCase() === username.toLowerCase())
-      );
       return userSupported.slice(0, limit);
     } catch (e) {
-      console.warn('Error fetching user contribs for supported wishes:', e);
-      return wishes.filter(w =>
-        w.supporters?.some(s => s.username.toLowerCase() === username.toLowerCase())
+      console.warn('Error fetching user activity for supported wishes:', e);
+      return allWishes.filter(w =>
+        w.supporters?.some(s => s.username?.toLowerCase() === normUser)
       ).slice(0, limit);
     }
   }

@@ -23,7 +23,7 @@ router.get('/:username', async (req: Request, res: Response) => {
     // Also include wishes supported locally in WikiWish by this user
     if (supportedWishesByUser.has(username)) {
       const localIds = supportedWishesByUser.get(username)!;
-      const { wishes } = await wikimediaClient.getAllWishes(100);
+      const wishes = await wikimediaClient.fetchAllWishesFromMeta();
       for (const w of wishes) {
         if (localIds.has(w.id) && !supported.some(s => s.id === w.id)) {
           supported.push(w);
@@ -65,7 +65,7 @@ router.get('/:username/supported', async (req: Request, res: Response) => {
     // Merge in any locally supported wishes in WikiWish
     if (supportedWishesByUser.has(username)) {
       const localIds = supportedWishesByUser.get(username)!;
-      const { wishes: allWishes } = await wikimediaClient.getAllWishes(100);
+      const allWishes = await wikimediaClient.fetchAllWishesFromMeta();
       for (const w of allWishes) {
         if (localIds.has(w.id) && !wishes.some(s => s.id === w.id)) {
           wishes.push(w);

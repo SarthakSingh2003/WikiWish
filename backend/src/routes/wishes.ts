@@ -8,7 +8,7 @@ export const supportedWishesByUser = new Map<string, Set<number>>();
 
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const limit = parseInt(req.query.limit as string) || 100;
+    const limit = parseInt(req.query.limit as string) || 1000;
     const continueToken = req.query.continue as string | undefined;
     const query = req.query.search as string | undefined;
 
@@ -37,7 +37,7 @@ router.get('/user-supports', async (req: Request, res: Response) => {
   const supportedSet = supportedWishesByUser.get(username) || new Set<number>();
 
   try {
-    const { wishes } = await wikimediaClient.getAllWishes(100);
+    const wishes = await wikimediaClient.fetchAllWishesFromMeta();
     for (const w of wishes) {
       if (w.supporters?.some(s => s.username?.toLowerCase() === username.toLowerCase())) {
         supportedSet.add(w.id);
