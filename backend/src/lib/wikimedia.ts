@@ -488,7 +488,7 @@ class WikimediaClient {
         // Support vote subpage: Community Wishlist/W<id>/Votes
         const voteMatch = title.match(/^Community Wishlist\/(W\d+)\/Votes$/i);
         if (voteMatch) {
-          supportedTitles.add(`Community Wishlist/${voteMatch[1].toUpperCase()}`);
+          supportedTitles.add(voteMatch[1].toUpperCase());
           continue;
         }
 
@@ -502,7 +502,7 @@ class WikimediaClient {
             comment.includes('created page');
 
           if (isCreation) {
-            createdTitles.add(`Community Wishlist/${wishMatch[1].toUpperCase()}`);
+            createdTitles.add(wishMatch[1].toUpperCase());
           }
         }
       }
@@ -540,8 +540,9 @@ class WikimediaClient {
       const { createdTitles } = await this.fetchUserWishActivity(username);
 
       const userWishes = allWishes.filter(w => {
-        const crwUpper = (w.crwtitle || '').toUpperCase();
-        const isCreated = createdTitles.has(crwUpper);
+        const wishIdMatch = (w.crwtitle || '').match(/(W\d+)$/i);
+        const wishKey = wishIdMatch ? wishIdMatch[1].toUpperCase() : '';
+        const isCreated = wishKey ? createdTitles.has(wishKey) : false;
         const isAuthor = w.author && w.author.toLowerCase() === normUser;
         return isCreated || isAuthor;
       }).map(w => {
@@ -566,8 +567,9 @@ class WikimediaClient {
       const { supportedTitles } = await this.fetchUserWishActivity(username);
 
       const userSupported = allWishes.filter(w => {
-        const crwUpper = (w.crwtitle || '').toUpperCase();
-        const isVoted = supportedTitles.has(crwUpper);
+        const wishIdMatch = (w.crwtitle || '').match(/(W\d+)$/i);
+        const wishKey = wishIdMatch ? wishIdMatch[1].toUpperCase() : '';
+        const isVoted = wishKey ? supportedTitles.has(wishKey) : false;
         const isSupporter = w.supporters?.some(s => s.username?.toLowerCase() === normUser);
         return isVoted || isSupporter;
       });
