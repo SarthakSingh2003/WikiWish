@@ -68,22 +68,28 @@ export function Dashboard() {
     );
   }
 
-  const rawWishes: WikiWish[] = (data?.[activeTab] || []) as WikiWish[];
-  const createdCount = data?.statistics?.created ?? (data?.created?.length || 0);
-  const supportedCount = data?.statistics?.supported ?? (data?.supported?.length || 0);
+  const rawWishes: WikiWish[] = (Array.isArray(data?.[activeTab]) ? data[activeTab] : []) as WikiWish[];
+  const createdCount = data?.statistics?.created ?? (Array.isArray(data?.created) ? data.created.length : 0);
+  const supportedCount = data?.statistics?.supported ?? (Array.isArray(data?.supported) ? data.supported.length : 0);
   const totalActivity = createdCount + supportedCount;
 
-  const filteredWishes = searchQuery.trim()
-    ? rawWishes.filter(w =>
-        (w.title && w.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (w.description && w.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (w.crwtitle && w.crwtitle.toLowerCase().includes(searchQuery.toLowerCase()))
+  const filteredWishes = useMemo(() => {
+    const validWishes = rawWishes.filter(w => Boolean(w && typeof w === 'object'));
+    if (!searchQuery.trim()) return validWishes;
+    const q = searchQuery.toLowerCase().trim();
+    return validWishes.filter(w =>
+      Boolean(
+        (w.title && w.title.toLowerCase().includes(q)) ||
+        (w.description && w.description.toLowerCase().includes(q)) ||
+        (w.crwtitle && w.crwtitle.toLowerCase().includes(q))
       )
-    : rawWishes;
+    );
+  }, [rawWishes, searchQuery]);
 
   const sortedWishes = useMemo(() => {
     const list = [...filteredWishes];
     list.sort((a, b) => {
+      if (!a || !b) return 0;
       const votesA = typeof a.votecount === 'number' ? a.votecount : 0;
       const votesB = typeof b.votecount === 'number' ? b.votecount : 0;
 
@@ -105,7 +111,7 @@ export function Dashboard() {
         return new Date(a.created || 0).getTime() - new Date(b.created || 0).getTime();
       }
       if (sortBy === 'title-asc') {
-        return (a.title || '').localeCompare(b.title || '');
+        return (a.title || a.crwtitle || '').localeCompare(b.title || b.crwtitle || '');
       }
       return 0;
     });
@@ -119,7 +125,7 @@ export function Dashboard() {
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-text-primary">Dashboard</h1>
           <p className="text-text-secondary mt-1 text-sm sm:text-base">
-            Logged in as <span className="font-semibold text-text-primary">{user.displayName || user.username}</span>. Explore and manage your wishlist activity.
+            Logged in as <span className="font-semibold text-text-primary">{user?.displayName || user?.username || 'Contributor'}</span>. Explore and manage your wishlist activity.
           </p>
         </div>
 

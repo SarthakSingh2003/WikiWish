@@ -72,19 +72,19 @@ export function Navbar() {
 
           {user ? (
             <div className="flex items-center gap-1.5 sm:gap-2">
-              <Link to={`/user/${user.username}`}>
+              <Link to={`/user/${user?.username || ''}`}>
                 {/* Desktop User Pill */}
                 <Button variant="ghost" size="sm" className="hidden sm:flex gap-1.5 text-xs font-semibold px-2.5">
                   <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                  <span className="max-w-[120px] truncate">{user.displayName || user.username}</span>
+                  <span className="max-w-[120px] truncate">{user?.displayName || user?.username || 'User'}</span>
                 </Button>
 
                 {/* Mobile User Avatar */}
                 <div
                   className="sm:hidden flex items-center justify-center h-8 w-8 rounded-xl bg-brand/10 border border-brand/20 text-brand font-bold text-xs"
-                  title={user.username}
+                  title={user?.username || user?.displayName || 'User'}
                 >
-                  {user.username.slice(0, 2).toUpperCase()}
+                  {(user?.username || user?.displayName || 'U').slice(0, 2).toUpperCase()}
                 </div>
               </Link>
 

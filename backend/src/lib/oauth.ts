@@ -88,15 +88,13 @@ export async function initiateOAuth(): Promise<{
 
     const authHeader = buildOAuthHeader('POST', initiateUrl, oauthParams, consumerSecret, '');
 
-    const fetchFn = typeof globalThis.fetch === 'function' ? globalThis.fetch : fetch;
-    const response = await fetchFn(initiateUrl, {
+    const response = await fetch(initiateUrl, {
       method: 'POST',
       headers: {
         'User-Agent': USER_AGENT,
-        'Accept-Encoding': 'identity',
         'Authorization': authHeader,
       },
-    } as any);
+    });
 
     const bodyText = await response.text();
     return { ok: response.ok, bodyText };
@@ -156,15 +154,13 @@ export async function exchangeAccessToken(
 
   const authHeader = buildOAuthHeader('POST', tokenUrl, oauthParams, consumerSecret, requestTokenSecret);
 
-  const fetchFn = typeof globalThis.fetch === 'function' ? globalThis.fetch : fetch;
-  const response = await fetchFn(tokenUrl, {
+  const response = await fetch(tokenUrl, {
     method: 'POST',
     headers: {
       'User-Agent': USER_AGENT,
-      'Accept-Encoding': 'identity',
       'Authorization': authHeader,
     },
-  } as any);
+  });
 
   const bodyText = await response.text();
 
@@ -189,7 +185,6 @@ export async function exchangeAccessToken(
 export async function getAuthenticatedUser(accessToken: OAuthTokens): Promise<AuthenticatedUser> {
   const consumerKey = process.env.OAUTH_CONSUMER_KEY || '';
   const consumerSecret = process.env.OAUTH_CONSUMER_SECRET || '';
-  const fetchFn = typeof globalThis.fetch === 'function' ? globalThis.fetch : fetch;
 
   const identifyUrl = `${MEDIAWIKI_OAUTH_URL}?title=Special:OAuth/identify`;
   const nonce = crypto.randomBytes(16).toString('hex');
@@ -206,74 +201,32 @@ export async function getAuthenticatedUser(accessToken: OAuthTokens): Promise<Au
 
   const authHeader = buildOAuthHeader('GET', identifyUrl, oauthParams, consumerSecret, accessToken.secret);
 
-  try {
-    const response = await fetchFn(identifyUrl, {
-      method: 'GET',
-      headers: {
-        'User-Agent': USER_AGENT,
-        'Accept-Encoding': 'identity',
-        'Authorization': authHeader,
-      },
-    } as any);
+  const response = await fetch(identifyUrl, {
+    method: 'GET',
+    headers: {
+      'User-Agent': USER_AGENT,
+      'Authorization': authHeader,
+    },
+  });
 
-    const bodyText = await response.text();
+  const bodyText = await response.text();
 
-    if (response.ok && !bodyText.startsWith('Error:')) {
-      // Identify endpoint returns a signed JWT token: header.payload.signature
-      const jwtParts = bodyText.split('.');
-      if (jwtParts.length >= 2) {
-        const payloadJson = Buffer.from(jwtParts[1], 'base64url').toString('utf8');
-        const payload = JSON.parse(payloadJson);
-        const username = payload.username || payload.sub;
-        if (username) {
-          return {
-            username,
-            displayName: username,
-            editcount: payload.editcount,
-          };
-        }
-      }
-    }
-  } catch (err: any) {
-    console.warn('Special:OAuth/identify failed, attempting meta=userinfo fallback:', err.message);
+  if (!response.ok || bodyText.startsWith('Error:')) {
+    throw new Error(`Wikimedia identify failed: ${bodyText}`);
   }
 
-  // Resilient Fallback: Query MediaWiki API action=query&meta=userinfo with OAuth Authorization header
-  try {
-    const userinfoUrl = 'https://meta.wikimedia.org/w/api.php?action=query&meta=userinfo&format=json';
-    const nonceFallback = crypto.randomBytes(16).toString('hex');
-    const tsFallback = Math.floor(Date.now() / 1000).toString();
-    const oauthParamsFallback = {
-      oauth_consumer_key: consumerKey,
-      oauth_nonce: nonceFallback,
-      oauth_signature_method: 'HMAC-SHA1',
-      oauth_timestamp: tsFallback,
-      oauth_token: accessToken.key,
-      oauth_version: '1.0',
+  // Identify endpoint returns a signed JWT token: header.payload.signature
+  const jwtParts = bodyText.split('.');
+  if (jwtParts.length >= 2) {
+    const payloadJson = Buffer.from(jwtParts[1], 'base64url').toString('utf8');
+    const payload = JSON.parse(payloadJson);
+    const username = payload.username || payload.sub;
+    return {
+      username,
+      displayName: username,
+      editcount: payload.editcount,
     };
-    const authHeaderFallback = buildOAuthHeader('GET', userinfoUrl, oauthParamsFallback, consumerSecret, accessToken.secret);
-
-    const responseFallback = await fetchFn(userinfoUrl, {
-      method: 'GET',
-      headers: {
-        'User-Agent': USER_AGENT,
-        'Accept-Encoding': 'identity',
-        'Authorization': authHeaderFallback,
-      },
-    } as any);
-
-    const dataFallback = await responseFallback.json() as any;
-    const userObj = dataFallback?.query?.userinfo;
-    if (userObj?.name) {
-      return {
-        username: userObj.name,
-        displayName: userObj.name,
-        editcount: userObj.editcount,
-      };
-    }
-  } catch (errFallback: any) {
-    console.error('Fallback meta=userinfo error:', errFallback);
   }
 
-  throw new Error('Could not identify authenticated Wikimedia user from access token.');
+  throw new Error(`Unexpected identify payload format from Wikimedia: ${bodyText.slice(0, 100)}`);
 }

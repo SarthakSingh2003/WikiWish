@@ -83,7 +83,7 @@ export function UserExplorer() {
         return new Date(a.created || 0).getTime() - new Date(b.created || 0).getTime();
       }
       if (sortBy === 'title-asc') {
-        return (a.title || '').localeCompare(b.title || '');
+        return (a.title || a.crwtitle || '').localeCompare(b.title || b.crwtitle || '');
       }
       return 0;
     });
