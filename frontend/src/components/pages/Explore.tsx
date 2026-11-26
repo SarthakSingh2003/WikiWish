@@ -22,7 +22,7 @@ export function Explore() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedTag, setSelectedTag] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<SortOption>('votes-desc');
+  const [sortBy, setSortBy] = useState<SortOption>('updated-desc');
 
   const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ['explore-wishes'],
