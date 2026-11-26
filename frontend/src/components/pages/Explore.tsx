@@ -16,7 +16,7 @@ const STATUS_OPTIONS = [
   { value: 'declined', label: 'Declined' },
 ];
 
-type SortOption = 'votes-desc' | 'votes-asc' | 'newest' | 'oldest' | 'title-asc';
+type SortOption = 'updated-desc' | 'votes-desc' | 'votes-asc' | 'newest' | 'oldest' | 'title-asc';
 
 export function Explore() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -96,6 +96,11 @@ export function Explore() {
       const votesA = typeof a.votecount === 'number' ? a.votecount : 0;
       const votesB = typeof b.votecount === 'number' ? b.votecount : 0;
 
+      if (sortBy === 'updated-desc') {
+        const timeB = new Date(b.updated || b.created || 0).getTime();
+        const timeA = new Date(a.updated || a.created || 0).getTime();
+        return timeB - timeA;
+      }
       if (sortBy === 'votes-desc') {
         return votesB - votesA;
       }
@@ -225,6 +230,7 @@ export function Explore() {
               aria-label="Sort wishes"
               className="w-full bg-background border border-border-app rounded-xl px-3 py-2 sm:py-2.5 text-xs sm:text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all cursor-pointer"
             >
+              <option value="updated-desc">Most Recent Activity</option>
               <option value="votes-desc">Most Supported</option>
               <option value="votes-asc">Least Supported</option>
               <option value="newest">Newest First</option>

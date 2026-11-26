@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Heart, List, Users, Activity, Search, ShieldCheck } from 'lucide-react';
+import { Heart, List, Users, Activity, Search, ShieldCheck, ArrowUpDown, ChevronDown } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { WikiWish } from '../../types/wish';
 import { WishCard } from '../WishCard';
@@ -9,11 +9,13 @@ import { EmptyState } from '../ui/EmptyState';
 import { Button } from '../ui/Button';
 
 type FilterTab = 'created' | 'supported';
+export type WishSortOption = 'updated-desc' | 'votes-desc' | 'votes-asc' | 'newest' | 'oldest' | 'title-asc';
 
 export function Dashboard() {
   const { user, login } = useAuth();
   const [activeTab, setActiveTab] = useState<FilterTab>('created');
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<WishSortOption>('updated-desc');
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['user-dashboard', user?.username],
@@ -79,6 +81,37 @@ export function Dashboard() {
       )
     : rawWishes;
 
+  const sortedWishes = useMemo(() => {
+    const list = [...filteredWishes];
+    list.sort((a, b) => {
+      const votesA = typeof a.votecount === 'number' ? a.votecount : 0;
+      const votesB = typeof b.votecount === 'number' ? b.votecount : 0;
+
+      if (sortBy === 'updated-desc') {
+        const timeB = new Date(b.updated || b.created || 0).getTime();
+        const timeA = new Date(a.updated || a.created || 0).getTime();
+        return timeB - timeA;
+      }
+      if (sortBy === 'votes-desc') {
+        return votesB - votesA;
+      }
+      if (sortBy === 'votes-asc') {
+        return votesA - votesB;
+      }
+      if (sortBy === 'newest') {
+        return new Date(b.created || 0).getTime() - new Date(a.created || 0).getTime();
+      }
+      if (sortBy === 'oldest') {
+        return new Date(a.created || 0).getTime() - new Date(b.created || 0).getTime();
+      }
+      if (sortBy === 'title-asc') {
+        return (a.title || '').localeCompare(b.title || '');
+      }
+      return 0;
+    });
+    return list;
+  }, [filteredWishes, sortBy]);
+
   return (
     <div className="max-w-5xl mx-auto px-3.5 py-6 sm:px-6 sm:py-10 lg:px-8 space-y-8 sm:space-y-12 animate-in fade-in duration-300">
       {/* Header & Accurate Stats */}
@@ -117,7 +150,7 @@ export function Dashboard() {
 
       {/* Content Area */}
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 border-b border-border-app pb-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4 border-b border-border-app pb-4">
           <div className="flex flex-col sm:flex-row p-1 bg-surface-elevated rounded-xl w-full sm:w-fit border border-border-app gap-1 sm:gap-0">
             <TabButton
               active={activeTab === 'created'}
@@ -133,15 +166,35 @@ export function Dashboard() {
             />
           </div>
 
-          <div className="relative group max-w-full sm:max-w-sm w-full">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted group-focus-within:text-brand transition-colors" />
-            <input
-              type="text"
-              placeholder="Search your wishes..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-surface border border-border-app rounded-xl pl-10 pr-4 py-2.5 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all shadow-sm"
-            />
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full lg:w-auto">
+            <div className="relative group min-w-[200px] sm:min-w-[240px]">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted group-focus-within:text-brand transition-colors" />
+              <input
+                type="text"
+                placeholder="Search wishes..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-surface border border-border-app rounded-xl pl-10 pr-4 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all shadow-sm"
+              />
+            </div>
+
+            <div className="relative shrink-0">
+              <ArrowUpDown className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-muted pointer-events-none" />
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as WishSortOption)}
+                aria-label="Sort wishes"
+                className="w-full sm:w-auto bg-surface border border-border-app rounded-xl pl-9 pr-8 py-2 text-xs sm:text-sm font-medium text-text-primary focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all shadow-sm cursor-pointer appearance-none"
+              >
+                <option value="updated-desc">Most Recent Activity</option>
+                <option value="votes-desc">Support Votes (High to Low)</option>
+                <option value="votes-asc">Support Votes (Low to High)</option>
+                <option value="newest">Creation Date (Newest first)</option>
+                <option value="oldest">Creation Date (Oldest first)</option>
+                <option value="title-asc">Title (A to Z)</option>
+              </select>
+              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-muted pointer-events-none" />
+            </div>
           </div>
         </div>
 
@@ -151,9 +204,9 @@ export function Dashboard() {
           <div className="p-8 text-center bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 rounded-2xl">
             <p className="text-red-600 dark:text-red-400 font-medium">Failed to load wishes from Meta-Wiki. Please try again later.</p>
           </div>
-        ) : filteredWishes.length > 0 ? (
+        ) : sortedWishes.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filteredWishes.map((wish, index) => (
+            {sortedWishes.map((wish, index) => (
               <div
                 key={wish.id}
                 className="animate-in fade-in slide-in-from-bottom-4 duration-300 fill-mode-both"

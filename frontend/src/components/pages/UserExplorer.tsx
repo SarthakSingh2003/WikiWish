@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Search, User, Heart, List, Users, ExternalLink } from 'lucide-react';
+import { Search, User, Heart, List, Users, ExternalLink, ArrowUpDown, ChevronDown } from 'lucide-react';
 import { WikiWish } from '../../types/wish';
 import { WishCard } from '../WishCard';
 import { LoadingSkeleton } from '../ui/LoadingSkeleton';
@@ -9,12 +9,15 @@ import { EmptyState } from '../ui/EmptyState';
 import { Button } from '../ui/Button';
 
 type TabType = 'created' | 'supported';
+export type WishSortOption = 'updated-desc' | 'votes-desc' | 'votes-asc' | 'newest' | 'oldest' | 'title-asc';
 
 export function UserExplorer() {
   const { username: paramUsername } = useParams<{ username?: string }>();
   const [username, setUsername] = useState(paramUsername || '');
   const [searchUsername, setSearchUsername] = useState(paramUsername || '');
   const [activeTab, setActiveTab] = useState<TabType>('created');
+  const [wishSearch, setWishSearch] = useState('');
+  const [sortBy, setSortBy] = useState<WishSortOption>('updated-desc');
 
   useEffect(() => {
     if (paramUsername) {
@@ -43,6 +46,49 @@ export function UserExplorer() {
     enabled: !!searchUsername,
     staleTime: 5 * 60 * 1000,
   });
+
+  const rawWishes: WikiWish[] = (data?.[activeTab] || []) as WikiWish[];
+
+  const filteredWishes = useMemo(() => {
+    if (!wishSearch.trim()) return rawWishes;
+    const q = wishSearch.toLowerCase().trim();
+    return rawWishes.filter(w =>
+      (w.title && w.title.toLowerCase().includes(q)) ||
+      (w.description && w.description.toLowerCase().includes(q)) ||
+      (w.crwtitle && w.crwtitle.toLowerCase().includes(q))
+    );
+  }, [rawWishes, wishSearch]);
+
+  const sortedWishes = useMemo(() => {
+    const list = [...filteredWishes];
+    list.sort((a, b) => {
+      const votesA = typeof a.votecount === 'number' ? a.votecount : 0;
+      const votesB = typeof b.votecount === 'number' ? b.votecount : 0;
+
+      if (sortBy === 'updated-desc') {
+        const timeB = new Date(b.updated || b.created || 0).getTime();
+        const timeA = new Date(a.updated || a.created || 0).getTime();
+        return timeB - timeA;
+      }
+      if (sortBy === 'votes-desc') {
+        return votesB - votesA;
+      }
+      if (sortBy === 'votes-asc') {
+        return votesA - votesB;
+      }
+      if (sortBy === 'newest') {
+        return new Date(b.created || 0).getTime() - new Date(a.created || 0).getTime();
+      }
+      if (sortBy === 'oldest') {
+        return new Date(a.created || 0).getTime() - new Date(b.created || 0).getTime();
+      }
+      if (sortBy === 'title-asc') {
+        return (a.title || '').localeCompare(b.title || '');
+      }
+      return 0;
+    });
+    return list;
+  }, [filteredWishes, sortBy]);
 
   return (
     <div className="max-w-5xl mx-auto px-3.5 py-6 sm:px-6 sm:py-10 lg:px-8 space-y-8 sm:space-y-10 animate-in fade-in duration-300">
@@ -124,46 +170,83 @@ export function UserExplorer() {
             </a>
           </div>
 
-          {/* Activity Tabs */}
+          {/* Activity Tabs & Controls */}
           <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row p-1 bg-surface-elevated rounded-xl w-full sm:w-fit border border-border-app gap-1 sm:gap-0">
-              <button
-                onClick={() => setActiveTab('created')}
-                className={`flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 sm:py-2 rounded-lg text-sm font-semibold transition-all ${
-                  activeTab === 'created'
-                    ? 'bg-surface text-brand shadow-sm border border-border-app font-bold'
-                    : 'text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                <Heart className="h-4 w-4 text-red-500" />
-                <span>Created Wishes ({data.created?.length || 0})</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('supported')}
-                className={`flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 sm:py-2 rounded-lg text-sm font-semibold transition-all ${
-                  activeTab === 'supported'
-                    ? 'bg-surface text-brand shadow-sm border border-border-app font-bold'
-                    : 'text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                <List className="h-4 w-4 text-brand" />
-                <span>Supported Wishes ({data.supported?.length || 0})</span>
-              </button>
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4 border-b border-border-app pb-4">
+              <div className="flex flex-col sm:flex-row p-1 bg-surface-elevated rounded-xl w-full sm:w-fit border border-border-app gap-1 sm:gap-0">
+                <button
+                  onClick={() => setActiveTab('created')}
+                  className={`flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 sm:py-2 rounded-lg text-sm font-semibold transition-all ${
+                    activeTab === 'created'
+                      ? 'bg-surface text-brand shadow-sm border border-border-app font-bold'
+                      : 'text-text-secondary hover:text-text-primary'
+                  }`}
+                >
+                  <Heart className="h-4 w-4 text-red-500" />
+                  <span>Created Wishes ({data.created?.length || 0})</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('supported')}
+                  className={`flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 sm:py-2 rounded-lg text-sm font-semibold transition-all ${
+                    activeTab === 'supported'
+                      ? 'bg-surface text-brand shadow-sm border border-border-app font-bold'
+                      : 'text-text-secondary hover:text-text-primary'
+                  }`}
+                >
+                  <List className="h-4 w-4 text-brand" />
+                  <span>Supported Wishes ({data.supported?.length || 0})</span>
+                </button>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full lg:w-auto">
+                <div className="relative group min-w-[200px] sm:min-w-[240px]">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted group-focus-within:text-brand transition-colors" />
+                  <input
+                    type="text"
+                    placeholder="Search contributor wishes..."
+                    value={wishSearch}
+                    onChange={(e) => setWishSearch(e.target.value)}
+                    className="w-full bg-surface border border-border-app rounded-xl pl-10 pr-4 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all shadow-sm"
+                  />
+                </div>
+
+                <div className="relative shrink-0">
+                  <ArrowUpDown className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-muted pointer-events-none" />
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as WishSortOption)}
+                    aria-label="Sort contributor wishes"
+                    className="w-full sm:w-auto bg-surface border border-border-app rounded-xl pl-9 pr-8 py-2 text-xs sm:text-sm font-medium text-text-primary focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all shadow-sm cursor-pointer appearance-none"
+                  >
+                    <option value="updated-desc">Most Recent Activity</option>
+                    <option value="votes-desc">Support Votes (High to Low)</option>
+                    <option value="votes-asc">Support Votes (Low to High)</option>
+                    <option value="newest">Creation Date (Newest first)</option>
+                    <option value="oldest">Creation Date (Oldest first)</option>
+                    <option value="title-asc">Title (A to Z)</option>
+                  </select>
+                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-muted pointer-events-none" />
+                </div>
+              </div>
             </div>
 
-            {data[activeTab]?.length > 0 ? (
+            {sortedWishes.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {data[activeTab].map((wish: WikiWish) => (
+                {sortedWishes.map((wish: WikiWish) => (
                   <WishCard key={wish.id} wish={wish} showAuthor={activeTab === 'supported'} />
                 ))}
               </div>
             ) : (
               <div className="bg-surface rounded-2xl border border-border-app p-8 shadow-sm">
                 <EmptyState
-                  title="No activity found"
-                  description={`This contributor has not ${
-                    activeTab === 'created' ? 'submitted' : 'supported'
-                  } any Community Wishlist requests.`}
+                  title={wishSearch ? "No matching wishes" : "No activity found"}
+                  description={
+                    wishSearch
+                      ? `No wishes match "${wishSearch}" in ${activeTab === 'created' ? 'created' : 'supported'} proposals.`
+                      : `This contributor has not ${
+                          activeTab === 'created' ? 'submitted' : 'supported'
+                        } any Community Wishlist requests.`
+                  }
                   icon="search"
                 />
               </div>
