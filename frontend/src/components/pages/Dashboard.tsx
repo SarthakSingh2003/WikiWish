@@ -29,45 +29,6 @@ export function Dashboard() {
     staleTime: 2 * 60 * 1000,
   });
 
-  if (!user) {
-    return (
-      <div className="flex items-center justify-center min-h-[65vh] px-4">
-        <div className="text-center space-y-6 max-w-md w-full bg-surface border border-border-app p-8 rounded-2xl shadow-sm">
-          <div className="flex justify-center">
-            <img
-              src="/wikiwish.png"
-              alt="WikiWish Logo"
-              className="h-16 w-16 object-contain rounded-2xl shadow-sm p-2 bg-surface-elevated border border-border-app"
-            />
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-text-primary">
-              Access your Dashboard
-            </h1>
-            <p className="text-text-secondary text-sm leading-relaxed">
-              Sign in with your verified Wikimedia account to track your Community Wishlist submissions and supported requests.
-            </p>
-          </div>
-
-          <div className="pt-2">
-            <Button
-              size="lg"
-              onClick={login}
-              className="w-full h-11 justify-center gap-2 font-semibold shadow-sm"
-            >
-              <ShieldCheck className="h-4 w-4" />
-              Sign in with Wikimedia OAuth
-            </Button>
-          </div>
-
-          <p className="text-xs text-text-muted">
-            Official Wikimedia OAuth 1.0a authentication ensures genuine contributor verification.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   const rawWishes: WikiWish[] = (Array.isArray(data?.[activeTab]) ? data[activeTab] : []) as WikiWish[];
   const createdCount = data?.statistics?.created ?? (Array.isArray(data?.created) ? data.created.length : 0);
   const supportedCount = data?.statistics?.supported ?? (Array.isArray(data?.supported) ? data.supported.length : 0);
@@ -117,6 +78,45 @@ export function Dashboard() {
     });
     return list;
   }, [filteredWishes, sortBy]);
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-[65vh] px-4">
+        <div className="text-center space-y-6 max-w-md w-full bg-surface border border-border-app p-8 rounded-2xl shadow-sm">
+          <div className="flex justify-center">
+            <img
+              src="/wikiwish.png"
+              alt="WikiWish Logo"
+              className="h-16 w-16 object-contain rounded-2xl shadow-sm p-2 bg-surface-elevated border border-border-app"
+            />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-text-primary">
+              Access your Dashboard
+            </h1>
+            <p className="text-text-secondary text-sm leading-relaxed">
+              Sign in with your verified Wikimedia account to track your Community Wishlist submissions and supported requests.
+            </p>
+          </div>
+
+          <div className="pt-2">
+            <Button
+              size="lg"
+              onClick={login}
+              className="w-full h-11 justify-center gap-2 font-semibold shadow-sm"
+            >
+              <ShieldCheck className="h-4 w-4" />
+              Sign in with Wikimedia OAuth
+            </Button>
+          </div>
+
+          <p className="text-xs text-text-muted">
+            Official Wikimedia OAuth 1.0a authentication ensures genuine contributor verification.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-5xl mx-auto px-3.5 py-6 sm:px-6 sm:py-10 lg:px-8 space-y-8 sm:space-y-12 animate-in fade-in duration-300">
