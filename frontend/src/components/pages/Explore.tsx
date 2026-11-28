@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Search, Filter, Sparkles, X, ArrowUpDown, Tag, RefreshCw, PlusCircle, ExternalLink } from 'lucide-react';
 import { WikiWish } from '../../types/wish';
@@ -6,6 +6,8 @@ import { WishCard } from '../WishCard';
 import { LoadingSkeleton } from '../ui/LoadingSkeleton';
 import { EmptyState } from '../ui/EmptyState';
 import { Button } from '../ui/Button';
+import { ShortcutsModal } from '../ui/ShortcutsModal';
+import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All Statuses' },
@@ -23,6 +25,28 @@ export function Explore() {
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedTag, setSelectedTag] = useState<string>('all');
   const [sortBy, setSortBy] = useState<SortOption>('updated-desc');
+  const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const handleClearSearch = useCallback(() => setSearchQuery(''), []);
+  const handleToggleShortcutsModal = useCallback(
+    () => setIsShortcutsModalOpen(prev => !prev),
+    [],
+  );
+  const handleCloseModal = useCallback((): boolean => {
+    if (isShortcutsModalOpen) {
+      setIsShortcutsModalOpen(false);
+      return true;
+    }
+    return false;
+  }, [isShortcutsModalOpen]);
+
+  useKeyboardShortcuts({
+    searchInputRef,
+    onClearSearch: handleClearSearch,
+    closeModal: handleCloseModal,
+    onToggleShortcutsModal: handleToggleShortcutsModal,
+  });
 
   const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ['explore-wishes'],
@@ -187,13 +211,15 @@ export function Explore() {
           <div className="relative group sm:col-span-2 lg:flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted group-focus-within:text-brand transition-colors" />
             <input
+              ref={searchInputRef}
               type="text"
               placeholder="Search by title, wish ID (e.g. W934), description, or tag..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full bg-background border border-border-app rounded-xl pl-10 pr-9 py-2 sm:py-2.5 text-xs sm:text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
+              aria-keyshortcuts="/"
+              className="w-full bg-background border border-border-app rounded-xl pl-10 pr-16 py-2 sm:py-2.5 text-xs sm:text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
             />
-            {searchQuery && (
+            {searchQuery ? (
               <button
                 onClick={() => setSearchQuery('')}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary p-0.5 rounded-full"
@@ -201,6 +227,10 @@ export function Explore() {
               >
                 <X className="h-4 w-4" />
               </button>
+            ) : (
+              <kbd className="absolute right-3 top-1/2 -translate-y-1/2 inline-flex items-center justify-center h-5 w-5 rounded border border-border-app bg-background text-[10px] font-mono font-semibold text-text-muted shadow-sm pointer-events-none">
+                /
+              </kbd>
             )}
           </div>
 
@@ -315,6 +345,11 @@ export function Explore() {
           ))}
         </div>
       )}
+
+      <ShortcutsModal
+        isOpen={isShortcutsModalOpen}
+        onClose={() => setIsShortcutsModalOpen(false)}
+      />
     </div>
   );
 }

@@ -44,6 +44,22 @@ export function SupportModal({
     }
   }, [isOpen, initialComment]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setIsSuccess(false);
+        setComment('');
+        setError(null);
+        setSuccessInfo(null);
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const cleanWishTitle = (wishTitle || '').replace(/^"+|"+$/g, '').trim();
@@ -151,8 +167,14 @@ export function SupportModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+      onClick={handleResetAndClose}
+    >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="support-modal-title"
         className="relative w-full max-w-lg max-h-[92dvh] overflow-y-auto bg-surface border border-border-app rounded-2xl p-5 sm:p-7 shadow-2xl space-y-5 sm:space-y-6 animate-in zoom-in-95 duration-200"
         onClick={e => e.stopPropagation()}
       >
@@ -178,7 +200,7 @@ export function SupportModal({
               </span>
             )}
           </div>
-          <h2 className="text-lg sm:text-2xl font-extrabold text-text-primary leading-tight">
+          <h2 id="support-modal-title" className="text-lg sm:text-2xl font-extrabold text-text-primary leading-tight">
             {isAlreadySupported ? 'Edit comment for' : 'Support'} "{cleanWishTitle}"
           </h2>
         </div>

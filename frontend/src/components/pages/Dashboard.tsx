@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Heart, List, Users, Activity, Search, ShieldCheck, ArrowUpDown, ChevronDown } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
@@ -7,6 +7,8 @@ import { WishCard } from '../WishCard';
 import { LoadingSkeleton } from '../ui/LoadingSkeleton';
 import { EmptyState } from '../ui/EmptyState';
 import { Button } from '../ui/Button';
+import { ShortcutsModal } from '../ui/ShortcutsModal';
+import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 
 type FilterTab = 'created' | 'supported';
 export type WishSortOption = 'updated-desc' | 'votes-desc' | 'votes-asc' | 'newest' | 'oldest' | 'title-asc';
@@ -16,6 +18,28 @@ export function Dashboard() {
   const [activeTab, setActiveTab] = useState<FilterTab>('created');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<WishSortOption>('updated-desc');
+  const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const handleClearSearch = useCallback(() => setSearchQuery(''), []);
+  const handleToggleShortcutsModal = useCallback(
+    () => setIsShortcutsModalOpen(prev => !prev),
+    [],
+  );
+  const handleCloseModal = useCallback((): boolean => {
+    if (isShortcutsModalOpen) {
+      setIsShortcutsModalOpen(false);
+      return true;
+    }
+    return false;
+  }, [isShortcutsModalOpen]);
+
+  useKeyboardShortcuts({
+    searchInputRef,
+    onClearSearch: handleClearSearch,
+    closeModal: handleCloseModal,
+    onToggleShortcutsModal: handleToggleShortcutsModal,
+  });
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['user-dashboard', user?.username],
@@ -119,6 +143,7 @@ export function Dashboard() {
   }
 
   return (
+    <>
     <div className="max-w-5xl mx-auto px-3.5 py-6 sm:px-6 sm:py-10 lg:px-8 space-y-8 sm:space-y-12 animate-in fade-in duration-300">
       {/* Header & Accurate Stats */}
       <div className="space-y-6 sm:space-y-8">
@@ -176,12 +201,19 @@ export function Dashboard() {
             <div className="relative group min-w-[200px] sm:min-w-[240px]">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted group-focus-within:text-brand transition-colors" />
               <input
+                ref={searchInputRef}
                 type="text"
                 placeholder="Search wishes..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-surface border border-border-app rounded-xl pl-10 pr-4 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all shadow-sm"
+                aria-keyshortcuts="/"
+                className="w-full bg-surface border border-border-app rounded-xl pl-10 pr-10 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all shadow-sm"
               />
+              {!searchQuery && (
+                <kbd className="absolute right-3 top-1/2 -translate-y-1/2 inline-flex items-center justify-center h-5 w-5 rounded border border-border-app bg-background text-[10px] font-mono font-semibold text-text-muted shadow-sm pointer-events-none">
+                  /
+                </kbd>
+              )}
             </div>
 
             <div className="relative shrink-0">
@@ -236,6 +268,12 @@ export function Dashboard() {
         )}
       </div>
     </div>
+
+    <ShortcutsModal
+      isOpen={isShortcutsModalOpen}
+      onClose={() => setIsShortcutsModalOpen(false)}
+    />
+    </>
   );
 }
 
