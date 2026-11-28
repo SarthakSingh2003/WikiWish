@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { ShieldCheck, X, Heart, ExternalLink } from 'lucide-react';
 import { Button } from './Button';
 import { useAuth } from '../../hooks/useAuth';
@@ -12,6 +13,18 @@ interface AuthPromptModalProps {
 export function AuthPromptModal({ isOpen, onClose, wishTitle, crwtitle }: AuthPromptModalProps) {
   const { login } = useAuth();
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const metaWikiVoteUrl = crwtitle
@@ -19,8 +32,14 @@ export function AuthPromptModal({ isOpen, onClose, wishTitle, crwtitle }: AuthPr
     : 'https://meta.wikimedia.org/wiki/Community_Wishlist';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+      onClick={onClose}
+    >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="auth-prompt-modal-title"
         className="relative w-full max-w-md bg-surface border border-border-app rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6 animate-in zoom-in-95 duration-200"
         onClick={e => e.stopPropagation()}
       >
@@ -36,7 +55,7 @@ export function AuthPromptModal({ isOpen, onClose, wishTitle, crwtitle }: AuthPr
           <div className="mx-auto w-12 h-12 rounded-2xl bg-brand/10 border border-brand/20 flex items-center justify-center text-brand">
             <Heart className="h-6 w-6 fill-brand/20" />
           </div>
-          <h2 className="text-xl sm:text-2xl font-extrabold text-text-primary">
+          <h2 id="auth-prompt-modal-title" className="text-xl sm:text-2xl font-extrabold text-text-primary">
             Support on Wikimedia
           </h2>
           <p className="text-sm text-text-secondary leading-relaxed">
